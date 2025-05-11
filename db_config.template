@@ -1,0 +1,9 @@
+# Database configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=lrmig2
+DB_USER=postgres
+DB_PASSWORD=your_password_here
+
+# Application configuration
+LOG_LEVEL=INFO 

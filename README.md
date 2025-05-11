@@ -88,6 +88,33 @@ A Docker-based utility for rationalizing multiple Lightroom libraries and backup
 - Document all API endpoints
 - Include setup instructions
 
+### Logging Standards
+- All logs are kept in version control in the `logs` directory
+- Log files are named with date and git commit information: `tests_YYYY-MM-DD_commit:hash_date:date.log`
+- This allows easy correlation between:
+  - Test results
+  - Code state (via commit hash)
+  - Timeline of changes
+- Log format includes:
+  - Timestamp
+  - Logger name
+  - Log level
+  - Message
+  - Git commit information
+- Log levels should be used appropriately:
+  - DEBUG: Detailed information for debugging
+  - INFO: General operational information
+  - WARNING: Warning messages for potentially harmful situations
+  - ERROR: Error events that might still allow the application to continue
+  - CRITICAL: Critical events that may lead to application termination
+
+### Benefits of Keeping Logs
+- Historical debugging capability
+- Performance tracking over time
+- Easy rollback reference
+- Correlation between code changes and test results
+- Documentation of system behavior across different states
+
 ## Roadmap
 
 ### Phase 1: Foundation (Current)
