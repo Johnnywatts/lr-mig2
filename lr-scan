@@ -1,0 +1,11 @@
+#!/bin/bash
+# Wrapper script for the lr-mig2 scanning utility
+
+# Get the absolute path to the project directory
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Go to the project directory
+cd "$PROJECT_DIR" || exit 1
+
+# Forward all arguments to the scan script
+docker/scan.sh "$@" 
