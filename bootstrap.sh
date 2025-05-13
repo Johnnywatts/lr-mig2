@@ -66,72 +66,6 @@ EOF
     exit 1
 fi
 
-# Function to parse YAML in the bootstrapper
-parse_yaml() {
-    local yaml_file=$1
-    local prefix=$2
-    local s
-    local w
-    local fs
-
-    s='[[:space:]]*'
-    w='[a-zA-Z0-9_.-]*'
-    fs="$(echo @|tr @ '\034')"
-
-    (
-        sed -e '/- [^\"]'"[^\']"'.*: /s|\([ ]*\)- \([^ ]*\): \(.*\)|\1-\n\1  \2: \3|g' |
-
-        sed -ne '/^--/s|--||g; s|\"|\\\"|g; s/[[:space:]]*$//g;' \
-            -e "/#.*[\"\']/!s| #.*||g; /^#/s|#.*||g;" \
-            -e "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
-            -e "s|^\($s\)\($w\)${s}[:-]$s\(.*\)$s\$|\1$fs\2$fs\3|p" |
-
-        awk -F"$fs" '{
-            indent = length($1)/2;
-            if (indent == 0) {
-                printf("\n%s:\n", $2);
-            } else {
-                vname[indent] = $2;
-                for (i in vname) {if (i > indent) {delete vname[i]}}
-                if (length($3) > 0) {
-                    vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i+1])("_")}
-                    printf("%s%s=\"%s\"\n", "'$prefix'",vn$2,$3);
-                }
-            }
-        }'
-    ) < "$yaml_file"
-}
-
-# Run bootstrapper container to generate docker-compose.yml and start application
-echo "Starting Lightroom File Management Utility..."
-echo "Using container config: config/container_config.yaml"
-echo "Using scan config: config/scan_targets.yaml"
-
-# Extract mount points from config directly in this script
-MOUNT_POINTS=""
-eval $(parse_yaml config/container_config.yaml "config_")
-
-# Process mount points from parsed YAML
-echo "Extracting mount points from configuration..."
-if [[ $(grep -c "config_container_mount_points_.*host_path" <<< "$(set)") -gt 0 ]]; then
-    # This is a simplified approach - in a real implementation you might need more robust parsing
-    for var in $(set | grep "config_container_mount_points_.*host_path" | cut -d= -f1); do
-        # Get index from variable name
-        idx=$(echo $var | sed -E 's/config_container_mount_points_([0-9]+)_host_path/\1/')
-        host_path_var="config_container_mount_points_${idx}_host_path"
-        container_path_var="config_container_mount_points_${idx}_container_path"
-        
-        # Get values
-        host_path="${!host_path_var}"
-        container_path="${!container_path_var}"
-        
-        # Add to mount points if both values exist
-        if [[ -n "$host_path" && -n "$container_path" ]]; then
-            MOUNT_POINTS="${MOUNT_POINTS} -v $host_path:$container_path:ro"
-        fi
-    done
-fi
-
 # Create network if it doesn't exist
 docker network inspect lrmig2_network >/dev/null 2>&1 || docker network create lrmig2_network
 
@@ -158,6 +92,22 @@ if ! docker ps | grep -q lrmig2-db; then
         sleep 1
     done
     echo ""
+fi
+
+# Build the application image
+echo "Building application image with latest dependencies..."
+APP_IMAGE=$(docker build -q -f docker/Dockerfile .)
+
+# Ensure the container has PyYAML installed
+echo "Verifying required packages..."
+if ! docker run --rm $APP_IMAGE pip list | grep -q PyYAML; then
+    echo "Installing required packages..."
+    docker run --rm \
+        -v "$(pwd):/app" \
+        $APP_IMAGE \
+        pip install pyyaml
+    # Rebuild the image with the new packages
+    APP_IMAGE=$(docker build -q -f docker/Dockerfile .)
 fi
 
 # Parse command line arguments
@@ -209,8 +159,7 @@ docker run --rm \
     -e DB_USER=postgres \
     -e DB_PASSWORD=postgres \
     -v "$(pwd):/app" \
-    $MOUNT_POINTS \
-    $(docker build -q -f docker/Dockerfile .) \
+    $APP_IMAGE \
     python -m src.scan_cli --config="$SCAN_CONFIG" $GROUP $VERBOSE
 
 echo "✅ Scan complete!" 

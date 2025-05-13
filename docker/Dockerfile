@@ -15,6 +15,9 @@ RUN mkdir -p /app/logs && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Explicitly install PyYAML (even if in requirements.txt, for certainty)
+RUN pip install pyyaml>=6.0
+
 # Copy application code
 COPY src/ ./src/
 COPY sql/ ./sql/

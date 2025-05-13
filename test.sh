@@ -140,8 +140,20 @@ if ! docker ps | grep -q lrmig2-db; then
 fi
 
 # Build the application image
-echo "Building application image..."
+echo "Building application image with latest dependencies..."
 APP_IMAGE=$(docker build -q -f docker/Dockerfile .)
+
+# Ensure the container has PyYAML installed
+echo "Verifying required packages..."
+if ! docker run --rm $APP_IMAGE pip list | grep -q PyYAML; then
+    echo "Installing required packages..."
+    docker run --rm \
+        -v "$(pwd):/app" \
+        $APP_IMAGE \
+        pip install pyyaml
+    # Rebuild the image with the new packages
+    APP_IMAGE=$(docker build -q -f docker/Dockerfile .)
+fi
 
 # Generate test data
 echo "Generating test data..."
