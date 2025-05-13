@@ -38,6 +38,115 @@ A Docker-based utility for rationalizing multiple Lightroom libraries and backup
   - Category assignments
   - Duplicate tracking
 
+## Quick Start Guide
+
+### Prerequisites
+- Docker 20.10+
+- Basic knowledge of YAML configuration
+
+### First-Time Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/lr-mig2.git
+   cd lr-mig2
+   ```
+
+2. Make bootstrap script executable:
+   ```bash
+   chmod +x bootstrap.sh
+   chmod +x test.sh
+   ```
+
+3. Edit configuration files:
+   - `config/container_config.yaml`: Configure mount points for your photo directories
+   - `config/scan_targets.yaml`: Configure which directories to scan
+
+4. Run the utility:
+   ```bash
+   ./bootstrap.sh
+   ```
+
+### Running the Utility
+
+#### Basic Scan
+```bash
+./bootstrap.sh
+```
+
+#### With Options
+```bash
+# Run with verbose output
+./bootstrap.sh --verbose
+
+# Scan only a specific group
+./bootstrap.sh --group personal
+
+# Use a different scan configuration
+./bootstrap.sh --scan-config config/my_custom_scan.yaml
+```
+
+#### Testing
+```bash
+# Run tests
+./test.sh
+
+# Clean and regenerate test data
+./test.sh --clean
+```
+
+### Configuration Files
+
+#### Container Configuration
+The `container_config.yaml` file configures Docker settings and mount points:
+
+```yaml
+# Container configuration
+database:
+  host: db
+  port: 5432
+  name: lrmig2
+  user: postgres
+  password: postgres
+
+application:
+  log_level: INFO
+  
+container:
+  # Base directories to mount
+  mount_points:
+    - host_path: /path/to/photos      # Path on host machine
+      container_path: /data/photos    # Path in container
+    - host_path: /mnt/backup          # Path on host machine
+      container_path: /data/backup    # Path in container
+```
+
+#### Scan Targets Configuration
+The `scan_targets.yaml` file defines which directories to scan:
+
+```yaml
+# Target directories for scanning
+target_directories:
+  personal:
+    - path: /data/photos/personal/2022
+      description: "Personal photos 2022"
+      category: "P"  # P for Personal
+    - path: /data/photos/personal/2023
+      description: "Personal photos 2023"
+      category: "P"
+      
+  work:
+    - path: /data/photos/work
+      description: "Work photos"
+      category: "W"  # W for Work
+
+# Global scan settings
+settings:
+  recursive: true
+  excluded_patterns:
+    - "*StarQ*"
+    - "export_*"
+```
+
 ## Processing Workflow
 
 1. **Initial Scan**
@@ -118,10 +227,10 @@ A Docker-based utility for rationalizing multiple Lightroom libraries and backup
 ## Roadmap
 
 ### Phase 1: Foundation (Current)
-- [ ] File scanning implementation
-- [ ] Metadata extraction and storage
-- [ ] Basic database schema
-- [ ] Initial test suite
+- [x] File scanning implementation
+- [x] Metadata extraction and storage
+- [x] Basic database schema
+- [x] Initial test suite
 
 ### Phase 2: Categorization
 - [ ] Manual category assignment interface
@@ -146,28 +255,6 @@ A Docker-based utility for rationalizing multiple Lightroom libraries and backup
 - [ ] Backup to slow storage
 - [ ] Recovery verification
 - [ ] Final cleanup tools
-
-## Getting Started
-
-### Prerequisites
-- Docker 20.10+
-- PostgreSQL 14+
-- Python 3.9+
-- Lightroom Classic (for reference)
-
-### Installation
-1. Clone the repository
-2. Build the Docker container
-3. Configure database connection
-4. Run initial setup script
-
-### Usage
-1. Configure target directories
-2. Run initial scan
-3. Review and assign categories
-4. Execute analysis
-5. Review and confirm changes
-6. Execute cleanup
 
 ## Contributing
 Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests.
