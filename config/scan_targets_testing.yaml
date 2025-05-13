@@ -1,0 +1,28 @@
+# Testing configuration for scanning
+# This defines test directories within the project directory
+
+target_directories:
+  # Personal photo directories (test)
+  personal:
+    - path: /app/tests/test_data/personal
+      description: "Personal test photos"
+      category: "P"  # P for Personal
+      
+  # Work photo directories (test)
+  work:
+    - path: /app/tests/test_data/work
+      description: "Work test photos"
+      category: "W"  # W for Work
+      
+  # Backup directories (test)
+  backup:
+    - path: /app/tests/test_data/backup
+      description: "Backup test photos"
+      category: null  # Will be assigned during processing
+
+# Global scan settings
+settings:
+  recursive: true
+  excluded_patterns:
+    - "*StarQ*"
+    - "export_*" 

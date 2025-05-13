@@ -21,6 +21,7 @@ COPY sql/ ./sql/
 
 # Set environment variables
 ENV PYTHONPATH=/app
+ENV RUNNING_IN_DOCKER=true
 
 # Command to run the application
 CMD ["python", "-m", "src"] 

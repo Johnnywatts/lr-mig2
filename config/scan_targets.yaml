@@ -1,37 +1,33 @@
-# Scan target directories configuration
+# Target directories for scanning
+
 target_directories:
   # Personal photo directories
   personal:
-    - path: /path/to/personal/photos/directory1
+    - path: /data/photos/personal/2022
       description: "Personal photos 2022"
       category: "P"  # P for Personal
-    - path: /path/to/personal/photos/directory2
+    - path: /data/photos/personal/2023
       description: "Personal photos 2023"
       category: "P"
       
   # Work photo directories
   work:
-    - path: /path/to/work/photos/directory1
-      description: "Client project photos"
+    - path: /data/photos/work
+      description: "Work photos"
       category: "W"  # W for Work
-    - path: /path/to/work/photos/directory2
-      description: "Product photography"
-      category: "W"
       
   # Backup directories (to be categorized)
   backup:
-    - path: /path/to/backup/directory1
-      description: "External drive backup 2022"
+    - path: /data/backup/lightroom
+      description: "External drive backup"
       category: null  # Will be assigned during processing
-    - path: /path/to/backup/directory2
-      description: "Cloud backup"
+    - path: /data/archive/old_photos
+      description: "Archive photos"
       category: null
 
 # Global scan settings
 settings:
   recursive: true
-  parallel_processing: false
-  max_threads: 4
   excluded_patterns:
     - "*StarQ*"
     - "export_*" 

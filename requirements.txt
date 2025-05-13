@@ -4,4 +4,4 @@ python-dotenv>=1.0.0    # Environment variable management
 exifread>=3.0.0         # EXIF data extraction
 pillow>=10.0.0          # Image processing
 pytest>=7.4.0           # Testing framework
-pyyaml>=6.0            # YAML parsing 
+pyyaml>=6.0             # YAML configuration 

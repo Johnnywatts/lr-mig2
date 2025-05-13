@@ -2,7 +2,7 @@
 """
 File: scan_cli.py
 Purpose: Command-line interface for scanning directories
-Version: 1.2.0
+Version: 1.3.0
 Last Updated: 2024-06-13
 """
 import argparse
@@ -16,10 +16,31 @@ from src.file_scanner import scanner
 from src.config_loader import load_yaml_config, get_target_directories, get_scan_settings
 from src.database import db
 
+def load_container_config():
+    """Load container configuration from environment or default file."""
+    container_config_path = os.environ.get('CONTAINER_CONFIG', 'config/container_config.yaml')
+    
+    try:
+        if os.path.exists(container_config_path):
+            with open(container_config_path, 'r') as f:
+                import yaml
+                config = yaml.safe_load(f)
+                return config
+        return {}
+    except Exception as e:
+        print(f"Warning: Failed to load container config: {e}")
+        return {}
+
 def main():
     """Main entry point for the CLI."""
-    # Set up logging
+    # Load container configuration
+    container_config = load_container_config()
+    app_config = container_config.get('application', {})
+    
+    # Set up logging with potential custom level from container config
+    log_level = app_config.get('log_level', 'INFO')
     logger = setup_logging()
+    logging.getLogger().setLevel(getattr(logging, log_level))
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Scan directories for image files.")
@@ -27,7 +48,7 @@ def main():
         "--config", 
         type=str,
         default="config/scan_targets.yaml",
-        help="Path to the YAML configuration file"
+        help="Path to the scan configuration file"
     )
     parser.add_argument(
         "--group", 
@@ -47,7 +68,7 @@ def main():
     
     args = parser.parse_args()
     
-    # Set log level
+    # Set log level from command line if requested
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
@@ -115,6 +136,9 @@ def main():
             logger.info(f"Scanning directory: {dir_path} ({description})")
             if category:
                 logger.info(f"Category: {category}")
+            
+            # Get max threads from container config if available
+            max_threads = app_config.get('max_threads', 1)
             
             # Scan the directory
             file_count = scanner.scan_directory(dir_path, recursive=recursive)

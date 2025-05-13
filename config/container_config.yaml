@@ -1,0 +1,30 @@
+# Container configuration for the Lightroom File Management Utility
+
+# Database settings
+database:
+  host: db
+  port: 5432
+  name: lrmig2
+  user: postgres
+  password: postgres
+
+# Application settings
+application:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  log_level: INFO
+  # Default locations for configs
+  scan_config_dir: /app/config
+  # Maximum number of threads for processing
+  max_threads: 4
+  
+# Container settings
+container:
+  # Base directories to mount
+  # These should be top-level directories that contain your photo libraries
+  mount_points:
+    - host_path: /home/photos      # Path on host machine
+      container_path: /data/photos # Path in container
+    - host_path: /mnt/backup       # Path on host machine
+      container_path: /data/backup # Path in container
+    - host_path: /mnt/archive      # Path on host machine
+      container_path: /data/archive # Path in container 

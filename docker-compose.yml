@@ -28,13 +28,16 @@ services:
       DB_NAME: lrmig2
       DB_USER: postgres
       DB_PASSWORD: postgres
+      CONTAINER_CONFIG: /app/config/container_config.yaml
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - .:/app
-      - ${PHOTO_DATA_DIR:-./data}:/data
-    command: python -m tests.test_database
+      - /home/photos:/data/photos:ro
+      - /mnt/backup:/data/backup:ro
+      - /mnt/archive:/data/archive:ro
+    command: python -m src.scan_cli --help
 
 volumes:
-  postgres_data: 
+  postgres_data:

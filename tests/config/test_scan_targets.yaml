@@ -1,0 +1,23 @@
+# Test scan targets configuration
+target_directories:
+  personal:
+    - path: /app/tests/test_data/personal
+      description: "Personal photos"
+      category: "P"
+      
+  work:
+    - path: /app/tests/test_data/work
+      description: "Work photos"
+      category: "W"
+      
+  backup:
+    - path: /app/tests/test_data/backup
+      description: "Backup photos"
+      category: null
+      
+# Global scan settings
+settings:
+  recursive: true
+  excluded_patterns:
+    - "*StarQ*"
+    - "export_*"

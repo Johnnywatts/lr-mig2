@@ -1,53 +1,13 @@
 #!/bin/bash
-# Main scanning utility script for Docker-based execution
-# This is the primary entry point for running the scanning utility
+# Run scanning based on the scan configuration
 
-set -e  # Exit on error
+set -e
 
 cd "$(dirname "$0")/.." || exit 1
 
-# Make sure config directory exists
-mkdir -p config
-
-# Default config file
-CONFIG_FILE="config/scan_targets.yaml"
-
-# Create example config if it doesn't exist
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Creating example configuration file..."
-    cat > "$CONFIG_FILE" << EOF
-# Scan target directories configuration
-target_directories:
-  # Personal photo directories - replace with actual paths
-  personal:
-    - path: /data/personal/photos1
-      description: "Personal photos 2022"
-      category: "P"  # P for Personal
-    - path: /data/personal/photos2
-      description: "Personal photos 2023"
-      category: "P"
-      
-  # Work photo directories - replace with actual paths
-  work:
-    - path: /data/work/photos1
-      description: "Client project photos"
-      category: "W"  # W for Work
-    - path: /data/work/photos2
-      description: "Product photography"
-      category: "W"
-
-# Global scan settings
-settings:
-  recursive: true
-  excluded_patterns:
-    - "*StarQ*"
-    - "export_*"
-EOF
-    echo "Created example configuration at $CONFIG_FILE"
-    echo "⚠️  Please edit this file with your actual directories before running"
-    echo "   Then run this script again to perform the scan"
-    exit 0
-fi
+# Default config files
+CONTAINER_CONFIG="config/container_config.yaml"
+SCAN_CONFIG="config/scan_targets.yaml"
 
 # Parse command line arguments
 VERBOSE=""
@@ -63,18 +23,23 @@ while [[ $# -gt 0 ]]; do
             GROUP="--group $2"
             shift 2
             ;;
-        --config|-c)
-            CONFIG_FILE="$2"
+        --scan-config|-s)
+            SCAN_CONFIG="$2"
+            shift 2
+            ;;
+        --container-config|-c)
+            CONTAINER_CONFIG="$2"
             shift 2
             ;;
         --help|-h)
             echo "Usage: docker/scan.sh [options]"
             echo
             echo "Options:"
-            echo "  --verbose, -v         Enable verbose output"
-            echo "  --group, -g GROUP     Only scan directories from this group"
-            echo "  --config, -c FILE     Use specified config file (default: config/scan_targets.yaml)"
-            echo "  --help, -h            Show this help message"
+            echo "  --verbose, -v                 Enable verbose output"
+            echo "  --group, -g GROUP             Only scan directories from this group"
+            echo "  --scan-config, -s FILE        Use specified scan config file (default: config/scan_targets.yaml)"
+            echo "  --container-config, -c FILE   Use specified container config file (default: config/container_config.yaml)"
+            echo "  --help, -h                    Show this help message"
             echo
             exit 0
             ;;
@@ -86,24 +51,37 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Ensure config files exist
+if [ ! -f "$CONTAINER_CONFIG" ]; then
+    echo "Container configuration file not found: $CONTAINER_CONFIG"
+    echo "Please create the container configuration file first."
+    exit 1
+fi
+
+if [ ! -f "$SCAN_CONFIG" ]; then
+    echo "Scan configuration file not found: $SCAN_CONFIG"
+    echo "Please create the scan configuration file first."
+    exit 1
+fi
+
+# Generate docker-compose file
+echo "Generating Docker configuration..."
+./docker/generate_compose.sh --config "$CONTAINER_CONFIG"
+
 # Ensure Docker is running
 if ! docker info > /dev/null 2>&1; then
     echo "⚠️  Docker doesn't seem to be running. Please start Docker and try again."
     exit 1
 fi
 
-# Check if containers are built
+# Build containers if needed
 if ! docker-compose ps -q app > /dev/null 2>&1; then
     echo "Building Docker containers..."
     docker-compose build
 fi
 
-# Ensure volume directories are accessible
-echo "Ensuring volume directories are accessible..."
-docker-compose run --rm --entrypoint "mkdir -p /data" app
-
 # Run the scan
-echo "Starting scan with configuration from $CONFIG_FILE..."
-docker-compose run --rm app python -m src.scan_cli --config=$CONFIG_FILE $GROUP $VERBOSE
+echo "Starting scan with configuration from $SCAN_CONFIG..."
+docker-compose run --rm app python -m src.scan_cli --config="$SCAN_CONFIG" $GROUP $VERBOSE
 
 echo "✅ Scan complete!" 
