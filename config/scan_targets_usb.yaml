@@ -1,0 +1,28 @@
+# USB drive scanning configuration
+# Targets directories on USB drive mounted as F: in Windows
+
+target_directories:
+  # Personal photo directories on USB
+  personal:
+    - path: /mnt/f/main_lib
+      description: "Personal main library (with files removed)"
+      category: "P"  # P for Personal
+      
+  # Backup directories on USB
+  backup:
+    - path: /mnt/f/backup_lib
+      description: "Backup library (complete set)"
+      category: null  # Will be assigned during processing
+      
+  # Work photo directories (commented out)
+  # work:
+  #   - path: /app/tests/test_data/work
+  #     description: "Work test photos"
+  #     category: "W"  # W for Work
+
+# Global scan settings
+settings:
+  recursive: true
+  excluded_patterns:
+    - "*StarQ*"
+    - "export_*" 

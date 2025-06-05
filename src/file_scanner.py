@@ -1,7 +1,7 @@
 """
 File: file_scanner.py
 Purpose: Scans directories for image files and extracts metadata
-Version: 1.0.0
+Version: 1.0.1
 Last Updated: 2024-06-13
 """
 import os
@@ -11,14 +11,25 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Set
 import fnmatch
-import exifread
-from PIL import Image
-
+import subprocess
 from src.config import SUPPORTED_RAW_FORMATS, EXCLUDED_DIRS
 from src.database import db
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+# Define module-level variables
+EXIFTOOL_AVAILABLE = False
+
+# Import dependencies
+try:
+    import exiftool
+    EXIFTOOL_AVAILABLE = True
+except ImportError:
+    logger.warning("PyExifTool not installed. Falling back to basic metadata extraction.")
+    # Keep the old imports as fallback
+    import exifread
+    from PIL import Image
 
 class FileScanner:
     """Scans directories for image files and extracts metadata."""
@@ -27,7 +38,31 @@ class FileScanner:
         """Initialize the file scanner."""
         self.supported_extensions = set(SUPPORTED_RAW_FORMATS + ['.jpg', '.jpeg'])
         self.excluded_patterns = EXCLUDED_DIRS
+        self.et = None
         
+        # Initialize ExifTool if available
+        if EXIFTOOL_AVAILABLE:
+            try:
+                self.et = exiftool.ExifToolHelper()
+                logger.info("ExifTool initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize ExifTool: {e}")
+    
+    def cleanup(self):
+        """Explicitly clean up resources before shutdown."""
+        if self.et is not None:
+            try:
+                self.et.terminate()
+            except Exception as e:
+                logger.warning(f"Error terminating ExifTool: {e}")
+            finally:
+                # Set to None to prevent library's __del__ from being called
+                self.et = None
+    
+    def __del__(self):
+        """Simplified destructor to avoid shutdown errors."""
+        pass
+    
     def is_excluded_dir(self, dirpath: str) -> bool:
         """Check if directory should be excluded based on patterns.
         
@@ -140,7 +175,7 @@ class FileScanner:
             return False
     
     def _extract_exif(self, file_path: str) -> Dict[str, Any]:
-        """Extract EXIF data from image file.
+        """Extract EXIF data from image file using ExifTool.
         
         Args:
             file_path: Path to the image file
@@ -151,7 +186,42 @@ class FileScanner:
         exif_data = {}
         
         try:
-            # For RAW files
+            # Use ExifTool if available (preferred method)
+            if self.et is not None:
+                metadata = self.et.get_metadata(file_path)
+                
+                # Convert metadata to a flat dictionary with string values
+                if isinstance(metadata, dict):
+                    # Handle dictionary return
+                    for key, value in metadata.items():
+                        # Skip binary data
+                        if isinstance(value, bytes):
+                            continue
+                        # Convert values to strings to ensure they're serializable
+                        if hasattr(value, '__str__'):
+                            exif_data[key] = str(value)
+                elif isinstance(metadata, list) and len(metadata) > 0:
+                    # Handle list return - take the first item if it's a dictionary
+                    if isinstance(metadata[0], dict):
+                        for key, value in metadata[0].items():
+                            if isinstance(value, bytes):
+                                continue
+                            if hasattr(value, '__str__'):
+                                exif_data[key] = str(value)
+                    else:
+                        # Just store the raw values as numbered keys
+                        for i, value in enumerate(metadata):
+                            if isinstance(value, bytes):
+                                continue
+                            if hasattr(value, '__str__'):
+                                exif_data[f"value_{i}"] = str(value)
+                
+                return exif_data
+                
+            # Fallback to old method if ExifTool is not available
+            logger.debug(f"Using fallback metadata extraction for {file_path}")
+            
+            # For RAW files use exifread
             with open(file_path, 'rb') as f:
                 tags = exifread.process_file(f, details=False)
                 # Convert exifread tags to serializable dictionary
