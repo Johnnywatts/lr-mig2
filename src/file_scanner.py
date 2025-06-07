@@ -26,13 +26,13 @@ EXIFTOOL_AVAILABLE = False
 
 # Import dependencies
 try:
-    import exiftool
+    import exiftool # type: ignore
     EXIFTOOL_AVAILABLE = True
 except ImportError:
     logger.warning("PyExifTool not installed. Falling back to basic metadata extraction.")
     # Keep the old imports as fallback
-    import exifread
-    from PIL import Image
+    import exifread # type: ignore
+    from PIL import Image # type: ignore
 
 class PerformanceTracker:
     """Tracks performance metrics during scanning."""
