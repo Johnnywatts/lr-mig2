@@ -1,0 +1,16 @@
+# Performance testing configuration
+# Small subset for gathering baseline performance stats
+
+target_directories:
+  # Single subdirectory for performance testing
+  perf_test:
+    - path: "/mnt/f/PersonalLib/John and Andrea/Thomas"
+      description: "Performance test subset - Thomas photos"
+      category: "P"  # P for Personal
+
+# Global scan settings
+settings:
+  recursive: true
+  excluded_patterns:
+    - "*StarQ*"
+    - "export_*" 

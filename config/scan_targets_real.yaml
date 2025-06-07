@@ -1,0 +1,22 @@
+# Real library scanning configuration
+# Targets personal library on F: and mixed content on G:
+
+target_directories:
+  # Personal photo library
+  personal:
+    - path: /mnt/f/PersonalLib
+      description: "Current personal photo library"
+      category: "P"  # P for Personal
+      
+  # Mixed content drive (professional work and old personal copies)
+  mixed:
+    - path: /mnt/g
+      description: "Mixed professional work and old personal backups"
+      category: null  # Will be assigned during processing
+
+# Global scan settings
+settings:
+  recursive: true
+  excluded_patterns:
+    - "*StarQ*"
+    - "export_*" 

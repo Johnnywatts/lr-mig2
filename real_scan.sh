@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run tests using Docker
+# Run real library scan using Docker
 
 # Set up error handling
 set -e
@@ -11,8 +11,7 @@ cd "$SCRIPT_DIR"
 # Parse command line arguments
 VERBOSE=""
 GROUP=""
-CLEAN=""
-CONFIG="config/scan_targets_testing.yaml"  # Default config
+CONFIG="config/scan_targets_real.yaml"  # Default to real config
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -24,22 +23,17 @@ while [[ $# -gt 0 ]]; do
             GROUP="--group $2"
             shift 2
             ;;
-        --clean|-c)
-            CLEAN="--clean"
-            shift
-            ;;
         --config)
             CONFIG="$2"
             shift 2
             ;;
         --help|-h)
-            echo "Usage: ./test.sh [options]"
+            echo "Usage: ./real_scan.sh [options]"
             echo
             echo "Options:"
             echo "  --verbose, -v         Enable verbose output"
             echo "  --group, -g GROUP     Only scan directories from this group"
-            echo "  --clean, -c           Clean existing test data before generating"
-            echo "  --config CONFIG       Use specified config file (default: config/scan_targets_testing.yaml)"
+            echo "  --config CONFIG       Use specified config file (default: config/scan_targets_real.yaml)"
             echo "  --help, -h            Show this help message"
             echo
             exit 0
@@ -55,11 +49,11 @@ done
 # Create config directory if it doesn't exist
 mkdir -p config
 
-# Check if container config exists, create minimal test one if not
+# Check if container config exists, create minimal one if not
 if [ ! -f "config/container_config.yaml" ]; then
     echo "Creating minimal container configuration..."
     cat > config/container_config.yaml << EOF
-# Minimal container configuration for testing
+# Minimal container configuration for scanning
 
 # Database settings
 database:
@@ -75,46 +69,10 @@ application:
   
 # Container settings
 container:
-  # No external mount points needed for testing
+  # No external mount points needed for scanning
   mount_points: []
 EOF
     echo "Created minimal container configuration at config/container_config.yaml"
-fi
-
-# Create test scan config if it doesn't exist
-if [ ! -f "config/scan_targets_testing.yaml" ]; then
-    echo "Creating test scan configuration..."
-    cat > config/scan_targets_testing.yaml << EOF
-# Testing configuration for scanning
-# This defines test directories within the project directory
-
-target_directories:
-  # Personal photo directories (test)
-  personal:
-    - path: /app/tests/test_data/personal
-      description: "Personal test photos"
-      category: "P"
-      
-  # Work photo directories (test)
-  work:
-    - path: /app/tests/test_data/work
-      description: "Work test photos"
-      category: "W"
-      
-  # Backup directories (test)
-  backup:
-    - path: /app/tests/test_data/backup
-      description: "Backup test photos"
-      category: null
-
-# Global scan settings
-settings:
-  recursive: true
-  excluded_patterns:
-    - "*StarQ*"
-    - "export_*"
-EOF
-    echo "Created test scan configuration at config/scan_targets_testing.yaml"
 fi
 
 # Create network if it doesn't exist
@@ -126,9 +84,20 @@ if ! docker ps -a | grep -q lrmig2-db; then
     echo "Starting database container..."
     docker run -d --name lrmig2-db \
         --network lrmig2_network \
+        --cpus="6" \
+        --memory="16g" \
+        --memory-swap="16g" \
         -e POSTGRES_DB=lrmig2 \
         -e POSTGRES_USER=postgres \
         -e POSTGRES_PASSWORD=postgres \
+        -e POSTGRES_SHARED_BUFFERS=4GB \
+        -e POSTGRES_EFFECTIVE_CACHE_SIZE=12GB \
+        -e POSTGRES_WORK_MEM=256MB \
+        -e POSTGRES_MAINTENANCE_WORK_MEM=1GB \
+        -e POSTGRES_MAX_CONNECTIONS=50 \
+        -e POSTGRES_CHECKPOINT_SEGMENTS=64 \
+        -e POSTGRES_CHECKPOINT_COMPLETION_TARGET=0.9 \
+        -e POSTGRES_WAL_BUFFERS=64MB \
         -v lrmig2_postgres_data:/var/lib/postgresql/data \
         -v "$(pwd)/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql" \
         postgres:14
@@ -168,27 +137,24 @@ if ! docker run --rm $APP_IMAGE pip list | grep -q PyYAML; then
     APP_IMAGE=$(docker build -q -f docker/Dockerfile .)
 fi
 
-# Generate test data
-echo "Generating test data..."
+# Run real library scan
+echo "Running real library scan with config: $CONFIG"
 docker run --rm \
-    --name lrmig2-test-gen \
+    --name lrmig2-real-scan \
     --network lrmig2_network \
-    -v "$(pwd):/app" \
-    $APP_IMAGE \
-    python tests/generate_test_data.py $CLEAN
-
-# Run test scan
-echo "Running test scan with config: $CONFIG"
-docker run --rm \
-    --name lrmig2-test-scan \
-    --network lrmig2_network \
+    --cpus="16" \
+    --memory="32g" \
     -e DB_HOST=lrmig2-db \
     -e DB_PORT=5432 \
     -e DB_NAME=lrmig2 \
     -e DB_USER=postgres \
     -e DB_PASSWORD=postgres \
+    -e PYTHONUNBUFFERED=1 \
+    -e OMP_NUM_THREADS=16 \
     -v "$(pwd):/app" \
+    -v "/mnt/f:/mnt/f" \
+    -v "/mnt/g:/mnt/g" \
     $APP_IMAGE \
     python -m src.scan_cli --config="$CONFIG" $GROUP $VERBOSE
 
-echo "✅ Tests complete!" 
+echo "✅ Real library scan complete!" 

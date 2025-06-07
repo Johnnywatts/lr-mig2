@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 
 from src.logger import setup_logging
-from src.file_scanner import scanner
+from src.file_scanner import FileScanner
 from src.config_loader import load_yaml_config, get_target_directories, get_scan_settings
 from src.database import db
 
@@ -71,6 +71,10 @@ def main():
     # Set log level from command line if requested
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+        # But suppress noisy third-party library debug messages
+        logging.getLogger('exifread').setLevel(logging.WARNING)
+        logging.getLogger('PIL').setLevel(logging.WARNING)
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
     
     # Test database connection
     if not db.test_connection():
@@ -126,27 +130,34 @@ def main():
             logger.info("Test completed successfully. Found valid directories to scan.")
             sys.exit(0)
         
-        # Process each directory
-        total_files = 0
-        for target in valid_targets:
-            dir_path = target.get('path')
-            description = target.get('description', '')
-            category = target.get('category')
-            
-            logger.info(f"Scanning directory: {dir_path} ({description})")
-            if category:
-                logger.info(f"Category: {category}")
-            
-            # Get max threads from container config if available
-            max_threads = app_config.get('max_threads', 1)
-            
-            # Scan the directory
-            file_count = scanner.scan_directory(dir_path, recursive=recursive)
-            total_files += file_count
-            
-            logger.info(f"Completed scanning {dir_path}. Processed {file_count} files.")
+        # Suppress interim progress messages
+        logging.getLogger('src.file_scanner').setLevel(logging.WARNING)
         
-        logger.info(f"All scans complete. Total files processed: {total_files}")
+        # Only show important messages
+        logger.info("🔥 Starting enhanced file scanner...")
+        
+        try:
+            # Need to scan all valid targets, not just one dir_path
+            total_files = 0
+            
+            for target in valid_targets:
+                dir_path = target.get('path')
+                logger.info(f"🚀 Scanning: {dir_path}")
+                
+                scanner = FileScanner(
+                    performance_reporting=False,  # Disable verbose progress reports
+                    use_db_logging=True
+                )
+                
+                file_count = scanner.scan_directory(dir_path, recursive=recursive)
+                total_files += file_count
+            
+            # Show final summary only
+            logger.info("🏁 SCAN COMPLETE!")
+            logger.info(f"📁 Total files processed: {total_files:,}")
+            
+        except Exception as e:
+            logger.error(f"❌ Scan failed: {e}")
         
     except Exception as e:
         logger.error(f"Error during scan process: {e}")

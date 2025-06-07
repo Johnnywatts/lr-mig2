@@ -21,5 +21,14 @@ DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
 # File scanning configuration
-SUPPORTED_RAW_FORMATS = [".dng", ".arw", ".cr2", ".cr3"]  # Add more as needed
+SUPPORTED_RAW_FORMATS = [
+    # RAW formats (without leading dots for comparison)
+    "dng", "arw", "cr2", "cr3", "nef", "raf", "orf", "rw2", "srw", "x3f",
+    # JPEG formats
+    "jpg", "jpeg", 
+    # TIFF formats
+    "tif", "tiff",
+    # Other formats
+    "png", "bmp"
+]
 EXCLUDED_DIRS = ["*StarQ*"]  # Directories to exclude from scanning 
