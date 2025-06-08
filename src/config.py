@@ -31,4 +31,20 @@ SUPPORTED_RAW_FORMATS = [
     # Other formats
     "png", "bmp"
 ]
-EXCLUDED_DIRS = ["*StarQ*"]  # Directories to exclude from scanning 
+
+# Enhanced exclusion patterns for Windows system directories and other problematic folders
+EXCLUDED_DIRS = [
+    "*StarQ*",                    # Lightroom export directories
+    "$RECYCLE.BIN*",             # Windows recycle bin
+    "System Volume Information*", # Windows system directory
+    "RECYCLER*",                 # Older Windows recycle bin
+    ".Trash*",                   # macOS trash
+    ".DS_Store*",                # macOS metadata
+    "Thumbs.db*",                # Windows thumbnails
+    "desktop.ini*",              # Windows desktop settings
+    ".git*",                     # Git directories
+    "__pycache__*",              # Python cache
+    "node_modules*",             # Node.js modules
+    ".svn*",                     # Subversion
+    ".hg*"                       # Mercurial
+] 

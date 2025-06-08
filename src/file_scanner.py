@@ -306,9 +306,13 @@ class FileScanner:
         
         try:
             if recursive:
-                for root, dirs, files in os.walk(directory):
-                    # Apply exclusion filters
+                for root, dirs, files in os.walk(directory, onerror=self._handle_walk_error):
+                    # Apply exclusion filters to prevent recursing into problematic directories
                     dirs[:] = [d for d in dirs if not self._should_exclude_directory(d)]
+                    
+                    # Skip processing if current directory should be excluded
+                    if self._should_exclude_directory(os.path.basename(root)):
+                        continue
                     
                     for file in files:
                         if self._is_supported_file(file):
@@ -319,8 +323,12 @@ class FileScanner:
                                 sys.stdout.write(f'\r🔍 Found {total_files:,} files...')
                                 sys.stdout.flush()
             else:
-                files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-                total_files = len([f for f in files if self._is_supported_file(f)])
+                try:
+                    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+                    total_files = len([f for f in files if self._is_supported_file(f)])
+                except PermissionError as e:
+                    logger.warning(f"Permission denied accessing {directory}: {e}")
+                    return 0
         
         except Exception as e:
             logger.warning(f"Error counting files in {directory}: {e}")
@@ -328,9 +336,15 @@ class FileScanner:
         
         sys.stdout.write(f'\r✅ Found {total_files:,} files total\n')
         return total_files
-    
+
+    def _handle_walk_error(self, error):
+        """Handle errors during os.walk traversal."""
+        logger.warning(f"Skipping directory due to error: {error}")
+        # Continue walking other directories
+        pass
+
     def scan_directory(self, directory: str, recursive: bool = True) -> int:
-        """Scan directory with progress bar."""
+        """Scan directory with improved error handling."""
         logger.info(f"🚀 Starting PERFORMANCE-ENHANCED scan of directory: {directory}")
         
         # Count total files first
@@ -339,10 +353,6 @@ class FileScanner:
         if total_files == 0:
             logger.warning("No supported files found.")
             return 0
-        
-        # TODO: Progress bar doesn't refresh properly in Docker container
-        # Need to fix console output buffering/carriage return handling
-        # self.progress_bar = ProgressBar(total_files)
         
         start_time = time.time()
         files_processed = 0
@@ -354,47 +364,52 @@ class FileScanner:
         processed_dirs = set()
         processed_dirs.add(directory)
         
-        # Walk through directory
-        for dirpath, dirnames, filenames in os.walk(directory):
-            # Skip excluded directories
-            if self.is_excluded_dir(dirpath):
-                logger.debug(f"Skipping excluded directory: {dirpath}")
-                dirnames.clear()  # This prevents os.walk from recursing into this dir
-                continue
-            
-            # Store directory info if it's a subdirectory
-            dir_path_obj = Path(dirpath)
-            if dirpath != directory:
-                parent_path = str(dir_path_obj.parent)
-                if parent_path in processed_dirs:
-                    self._store_directory(dirpath, parent_path)
-                    processed_dirs.add(dirpath)
-            
-            # Process files
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                if self._process_file(file_path):
-                    files_processed += 1
-            
-            # Stop recursion if not requested
-            if not recursive:
-                break
-            
-            if files_processed % 10 == 0:  # Update every 10 files instead of 50
-                elapsed = time.time() - start_time
-                files_per_sec = files_processed / elapsed if elapsed > 0 else 0
+        # Walk through directory with error handling
+        try:
+            for dirpath, dirnames, filenames in os.walk(directory, onerror=self._handle_walk_error):
+                # Skip excluded directories - check both the directory name and full path
+                if (self.is_excluded_dir(dirpath) or 
+                    self._should_exclude_directory(os.path.basename(dirpath))):
+                    logger.debug(f"Skipping excluded directory: {dirpath}")
+                    dirnames.clear()  # This prevents os.walk from recursing into this dir
+                    continue
                 
-                extra_info = f"({files_per_sec:.1f} files/sec)"
-                # self.progress_bar.update(files_processed, extra_info)
-            
-            # Simple progress logging every 1000 files
-            if files_processed % 1000 == 0:
-                elapsed = time.time() - start_time
-                files_per_sec = files_processed / elapsed if elapsed > 0 else 0
-                percent = (files_processed / total_files) * 100 if total_files > 0 else 0
+                # Filter out excluded subdirectories before recursion
+                dirnames[:] = [d for d in dirnames if not self._should_exclude_directory(d)]
                 
-                logger.info(f"📊 Progress: {files_processed:,}/{total_files:,} ({percent:.1f}%) - {files_per_sec:.1f} files/sec")
+                # Store directory info if it's a subdirectory
+                dir_path_obj = Path(dirpath)
+                if dirpath != directory:
+                    parent_path = str(dir_path_obj.parent)
+                    if parent_path in processed_dirs:
+                        self._store_directory(dirpath, parent_path)
+                        processed_dirs.add(dirpath)
+                
+                # Process files with error handling
+                for filename in filenames:
+                    try:
+                        file_path = os.path.join(dirpath, filename)
+                        if self._process_file(file_path):
+                            files_processed += 1
+                    except (PermissionError, OSError) as e:
+                        logger.debug(f"Skipping file due to permission error: {filename} - {e}")
+                        continue
+                
+                # Stop recursion if not requested
+                if not recursive:
+                    break
+                
+                # Progress reporting
+                if files_processed % 1000 == 0 and files_processed > 0:
+                    elapsed = time.time() - start_time
+                    files_per_sec = files_processed / elapsed if elapsed > 0 else 0
+                    percent = (files_processed / total_files) * 100 if total_files > 0 else 0
+                    
+                    logger.info(f"📊 Progress: {files_processed:,}/{total_files:,} ({percent:.1f}%) - {files_per_sec:.1f} files/sec")
         
+        except Exception as e:
+            logger.error(f"Error during directory scan: {e}")
+            
         # Generate final performance report
         if self.performance_tracker:
             final_report = self.performance_tracker.get_final_report()
@@ -432,10 +447,6 @@ class FileScanner:
                 logger.info("💡 Run database queries to analyze specific issues")
             
             logger.info("=" * 70)
-        
-        # TODO: Uncomment when progress bar display is fixed
-        # if self.progress_bar:
-        #     self.progress_bar.finish(f"Completed! {files_processed:,} files processed")
         
         logger.info(f"✅ Completed scanning {directory}. Processed {files_processed:,} files")
         return files_processed
